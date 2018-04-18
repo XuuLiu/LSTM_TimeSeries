@@ -103,7 +103,7 @@ def plot_results_multiple(predicted_data, true_data, prediction_len):
     plt.show()
 
 
-epochs  = 1
+epochs  = 10
 seq_len = 24
 
 
