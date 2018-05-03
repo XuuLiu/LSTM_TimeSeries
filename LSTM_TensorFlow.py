@@ -7,13 +7,14 @@ import math
 
 
 def LSTM():
-
+    
+    # generate data
     (X_train, y_train), (X_validation, y_validation) = generate_data("/Users/XuLiu/Documents/cwrnn/price_avg.txt")
     ntrain,ntest=X_train.shape[0],X_validation.shape[0]
 
 
-    diminput=90 #lag
-    dimhidden=140 #
+    diminput=90 #lag of time series
+    dimhidden=140 # just one hidden layer
     dimoutput=1 #one step ahead predict
     nsteps=1
     weights={
@@ -26,22 +27,17 @@ def LSTM():
     }
 
     def _RNN(_X,_W,_b,_nsteps,_name):
-        # 1. permute input from [batch_size,nstep,diminput] to [nsteps,batch_size,diminput]
-        #_X=tf.transpose(_X,[1,0,2])
-        # 2. reshape input to [nsteps*batch_size,diminput]
+        # reshape input to [nsteps*batch_size,diminput]
         _X=tf.reshape(_X,[-1,diminput])
-        # 3.Input layer => hidden layer
+        # Input layer => hidden layer
         _H=tf.matmul(_X,_W['hidden'])+_b['hidden']
-        # 4.splite data to 'nsteps' chunks, an i-th chunck indicateds i-th batch data
+        # splite data to 'nsteps' chunks, an i-th chunck indicateds i-th batch data
         _Hsplit=tf.split(_H,_nsteps,0)
-        # 5. get LSTM's final output(_LSTM_O) and state(_LSTM_S)
-        # Both _LSTM_O and _LSTM_S consist of 'batch_size' elements
-        # only _LSTM_O with be used to predict the output
         with tf.variable_scope(_name) as scope:
             #scope.reuse_variables()
             lstm_cell=tf.contrib.rnn.BasicLSTMCell(dimhidden,forget_bias=0.5)
             _LSTM_O,_LSTM_S=tf.contrib.rnn.static_rnn(cell=lstm_cell,inputs=_Hsplit,dtype=tf.float32)
-        # 6. output
+        # output
         _O=tf.matmul(_LSTM_O[-1],_W['out'])+_b['out']
         # return
         return {
@@ -54,8 +50,9 @@ def LSTM():
         }
 
     global_step=tf.Variable(0.001,name='global_step')
+    # learning rate decay
     learning_rate = tf.train.exponential_decay(
-        0.000001,
+        0.000001, # initial learning rate
         global_step,
         1000,
         0.57,
@@ -68,11 +65,8 @@ def LSTM():
     y=tf.placeholder('float',[None,dimoutput])
     myrnn=_RNN(x,weights,biases,nsteps,'basic')
     pred=myrnn['O']
-    #error = tf.reduce_sum(tf.square(y - pred),axis=1)
-    #loss = tf.reduce_mean(error, name="loss")
     loss=tf.reduce_mean(tf.square(tf.transpose(pred) - y))
     optm=tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
-    #accr=tf.reduce_mean(tf.cast(tf.equal(tf.argmax(pred,1),tf.argmax(y,1)),tf.float32))
     init=tf.global_variables_initializer()
 
     training_epoche=200
@@ -103,8 +97,7 @@ def LSTM():
         if epoch%display_step==0:
             avg_loss_test=0
             print "Epoch:%03d/%03d cost: %.9f"%(epoch,training_epoche,avg_loss)
-            #train_acc=sess.run(accr,feed_dict=feeds)
-            #print "Training accuracy:%.3f"%(train_acc)
+
         for i in range(int(math.floor(ntest/batch_size))):
             index_start = i * batch_size
             index_end = index_start + batch_size
@@ -116,7 +109,7 @@ def LSTM():
             predictions=sess.run(pred,feed_dict=feeds)
             pred_test.append(predictions)
         print "Test loss:%.3f"%(avg_loss_test)
-            # pirnt pic of validation
+            # print pic of validation
         np.savetxt('./pred_test/pred_test_epoch%3d'%epoch,pred_test)
         '''
         plt.clf()
@@ -133,7 +126,7 @@ def LSTM():
         '''
     sess.close()
 
-#not easy to shoulian, easy to stuck in local minimum
+
 
 
 if __name__ == "__main__":
